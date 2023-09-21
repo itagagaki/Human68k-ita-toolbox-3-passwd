@@ -1,28 +1,27 @@
-#! A:/bin/MAKE.X -f
-# Makefile for PASSWD
+# Makefile for ITA TOOLBOX #3 PASSWD
 
-AS	= \usr\pds\HAS.X -l -i $(INCLUDE)
-LK	= \usr\pds\hlk.x -x
-CV      = -\bin\CV.X -r
-INSTALL = copy
-BACKUP  = A:\bin\COPYALL.X -t
-CP      = copy
-RM      = -\usr\local\bin\rm -f
+AS	= HAS.X -i $(INCLUDE)
+LK	= hlk.x -x
+CV      = -CV.X -r
+CP      = cp
+RM      = -rm -f
 
-INCLUDE = ../fish/include
+INCLUDE = $(HOME)/fish/include
 
-DESTDIR   = A:\bin
-BACKUPDIR = B:\passwd\0.2
+DESTDIR   = A:/bin
+BACKUPDIR = B:/passwd/0.3
+RELEASE_ARCHIVE = PASSWD03
+RELEASE_FILES = MANIFEST README ../NOTICE CHANGES passwd.att passwd.ucb passwd.1 passwd.5
 
 EXTLIB = $(HOME)/fish/lib/ita.l
 
 ###
 
-PROGRAMS = passwd.att passwd.ucb
+PROGRAM = passwd.att passwd.ucb
 
 ###
 
-.PHONY: all clean clobber install backup
+.PHONY: all clean clobber install release backup
 
 .TERMINAL: *.h *.s
 
@@ -32,7 +31,7 @@ PROGRAMS = passwd.att passwd.ucb
 
 ###
 
-all:: $(PROGRAMS)
+all:: $(PROGRAM)
 
 clean::
 
@@ -41,16 +40,9 @@ clobber:: clean
 
 ###
 
-$(PROGRAMS) : $(INCLUDE)/doscall.h $(INCLUDE)/chrcode.h $(EXTLIB)
+$(PROGRAM) : $(INCLUDE)/doscall.h $(INCLUDE)/chrcode.h $(EXTLIB)
 
-install::
-	$(INSTALL) passwd.att $(DESTDIR)\passwd.x
-
-backup::
-	$(BACKUP) *.* $(BACKUPDIR)
-
-clean::
-	$(RM) passwd.o
+include ../Makefile.sub
 
 ###
 
@@ -59,17 +51,11 @@ passwd.att : passwd.s
 	$(LK) -o passwd.att passwd.o $(EXTLIB)
 	$(RM) passwd.o
 
-clean::
-	$(RM) passwd.att
-
 ###
 
 passwd.ucb : passwd.s
 	$(AS) -s SYSV=0 -s BSD=1 passwd.s
 	$(LK) -o passwd.ucb passwd.o $(EXTLIB)
 	$(RM) passwd.o
-
-clean::
-	$(RM) passwd.ucb
 
 ###

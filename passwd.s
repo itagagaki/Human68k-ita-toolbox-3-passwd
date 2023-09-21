@@ -2,6 +2,19 @@
 *
 * Itagaki Fumihiko 25-Aug-91  Create.
 * Itagaki Fumihiko 17-May-92  Add BSD style, and some bug fix.
+* 0.1
+* 0.2
+* Itagaki Fumihiko 27-Dec-94  SETBLOCKして引数デコードバッファはMALLOCで確保するよう変更
+* Itagaki Fumihiko 27-Dec-94  BSSがきちんと確保されていなかったのを修正
+* Itagaki Fumihiko 27-Dec-94  ログイン名入力時, 8文字を超える分はエコーバックしない
+* Itagaki Fumihiko 27-Dec-94  ログイン名入力時, ^Hと^?をdelete文字として処理
+* Itagaki Fumihiko 27-Dec-94  ログイン名入力時, ^Uは改行しない
+* Itagaki Fumihiko 27-Dec-94  ログイン名入力時, ^Wをwerase文字として処理
+* Itagaki Fumihiko 27-Dec-94  ログイン名入力時, ^Rをredraw文字として処理
+* Itagaki Fumihiko 27-Dec-94  ログイン名入力時, ^Zは通常の文字として処理
+* Itagaki Fumihiko 27-Dec-94  パスワード入力時, ^Hと^?をerase文字, ^Wをwerase文字, ^Uをkill文字として処理
+* Itagaki Fumihiko 27-Dec-94  メッセージを少し変更
+* 0.3
 *
 * Usage: passwd [ name ]
 
@@ -25,6 +38,7 @@
 .xref isupper
 .endif
 
+.xref isspace2
 .xref iscntrl
 .xref strlen
 .xref strchr
@@ -47,9 +61,6 @@
 .xref fgetpwnam
 .xref crypt
 
-PDB_argPtr	equ	$10
-PDB_namePtr	equ	$b4
-
 
 ** 可変定数
 MAXLOGNAME	equ	8
@@ -57,7 +68,7 @@ MAXPASSWD	equ	8
 
 RANDOM_POOLSIZE	equ	61
 
-STACKSIZE	equ	512
+STACKSIZE	equ	2048
 
 .text
 
@@ -69,6 +80,14 @@ start1:
 		movea.l	a0,a5				*  A5 := プログラムのメモリ管理ポインタのアドレス
 		lea	bsstop(pc),a6			*  A6 := BSSの先頭アドレス
 		lea	stack_bottom(a6),a7		*  A7 := スタックの底
+		lea	$10(a0),a0			*  A0 : PDBアドレス
+		move.l	a7,d0
+		sub.l	a0,d0
+		move.l	d0,-(a7)
+		move.l	a0,-(a7)
+		DOS	_SETBLOCK
+		addq.l	#8,a7
+	*
 		move.l	#-1,ptmp_fd(a6)
 		sf	remove_ptmp(a6)
 	*
@@ -92,18 +111,19 @@ sysroot_ok:
 		btst	#7,d0				*  character=1/block=0
 		beq	werror_leave_1
 	*
-	*  引数をデコードする
+	*  引数をデコードし，解釈する
 	*
-		lea	args_buffer(a6),a1		*  A1 := 引数列を格納するエリアの先頭アドレス
 		lea	1(a2),a0			*  A0 := コマンドラインの文字列の先頭アドレス
-		bsr	strlen				*  D0.L に A0 が示す文字列の長さを求め，
-		add.l	a1,d0				*    格納エリアの容量を
-		bcs	insufficient_memory
+		bsr	strlen				*  D0.L := コマンドラインの文字列の長さ
+		addq.l	#1,d0
+		move.l	d0,-(a7)
+		DOS	_MALLOC
+		addq.l	#4,a7
+		tst.l	d0
+		bmi	insufficient_memory
 
-		cmp.l	8(a5),d0			*    チェックする．
-		bhs	insufficient_memory
-
-		bsr	DecodeHUPAIR			*  引数をデコードする．
+		movea.l	d0,a1				*  A1 := 引数並び格納エリアの先頭アドレス
+		bsr	DecodeHUPAIR			*  引数をデコードする
 	*
 	*  変更するユーザ名を得る
 	*
@@ -125,8 +145,6 @@ sysroot_ok:
 		lea	namebuf(a6),a0
 		moveq	#8,d0
 		bsr	getname
-		bmi	leave_0
-
 		move.l	a0,d0
 set_name:
 		move.l	d0,name(a6)
@@ -181,6 +199,8 @@ name_ok:
 
 create_tmp:
 		bsr	drvchkp
+		bmi	cannot_write
+
 		move.w	#$20,-(a7)			*  通常のファイル
 		move.l	a0,-(a7)
 		DOS	_CREATE				*  ptmpを作成する
@@ -362,28 +382,24 @@ manage_signals:
 *
 * RETURN
 *      D0.L   入力文字数（CRやLFは含まない）
-*             ただし EOF なら -1
 *      CCR    TST.L D0
 ****************************************************************
 getname:
-		movem.l	d1-d2/a0-a2,-(a7)
+		movem.l	d1-d3/a0-a2,-(a7)
 		move.l	d0,d2
 getname_restart:
 		exg	a0,a1
 		bsr	print
 		exg	a0,a1
-		moveq	#0,d1
+		moveq	#0,d1				*  D1.L : 入力文字数
 		movea.l	a0,a2
 getname_loop:
 		DOS	_INKEY
 		tst.l	d0
-		bmi	getname_eof
+		bmi	leave_0
 
-		cmp.b	#EOT,d0
-		beq	getname_eof
-
-		cmp.b	#$04,d0				*  $04 == ^D : EOF
-		beq	getname_eof
+		cmp.b	#$04,d0				*  $04 == ^D
+		beq	leave_0
 
 		cmp.b	#CR,d0
 		beq	getname_done
@@ -391,50 +407,123 @@ getname_loop:
 		cmp.b	#LF,d0
 		beq	getname_done
 
+		cmp.b	#BS,d0
+		beq	getname_erase
+
+		cmp.b	#$7f,d0				*  $7f == ^?
+		beq	getname_erase
+
+		cmp.b	#$17,d0				*  $17 == ^W
+		beq	getname_werase
+
+		cmp.b	#$15,d0				*  $15 == ^U
+		beq	getname_kill
+
+		cmp.b	#$03,d0				*  $03 == ^C
+		beq	getname_interrupt
+
+		cmp.b	#$12,d0				*  $13 == ^R
+		beq	getname_redraw
+
+		cmp.l	d2,d1
+		bhs	getname_loop
+
+		bsr	echochar
+		move.b	d0,(a2)+
+		addq.l	#1,d1
+		bra	getname_loop
+
+getname_redraw:
+		bsr	put_newline
+		move.l	d1,d3
+		suba.l	d1,a2
+getname_redraw_loop:
+		subq.l	#1,d3
+		bcs	getname_loop
+
+		move.b	(a2)+,d0
+		bsr	echochar
+		bra	getname_redraw_loop
+
+getname_erase:
+		tst.l	d1
+		beq	getname_loop
+
+		bsr	getname_erase_sub
+		bra	getname_loop
+
+getname_werase:
+		tst.l	d1
+		beq	getname_loop
+
+		bsr	getname_erase_sub
+		move.b	(a2),d0
+		bsr	isspace2
+		beq	getname_werase
+getname_werase_2:
+		tst.l	d1
+		beq	getname_loop
+
+		move.b	-1(a2),d0
+		bsr	isspace2
+		beq	getname_loop
+		bsr	getname_erase_sub
+		bra	getname_werase_2
+
+getname_kill:
+		tst.l	d1
+		beq	getname_loop
+
+		bsr	getname_erase_sub
+		bra	getname_kill
+
+getname_done:
+		bsr	put_newline
+		clr.b	(a2)
+		move.l	d1,d0
+getname_return:
+		movem.l	(a7)+,d1-d3/a0-a2
+getname_erase_sub_return:
+		rts
+
+getname_interrupt:
+		bsr	echochar
+		move.w	#$200,d0
+		bra	leave
+
+getname_erase_sub:
+		subq.l	#1,d1
+		bsr	put_backspace
+		move.b	-(a2),d0
+		bsr	iscntrl
+		bne	getname_erase_sub_return
+put_backspace:
+		moveq	#BS,d0
+		bsr	putchar
+		moveq	#' ',d0
+		bsr	putchar
+		moveq	#BS,d0
+putchar:
+		move.w	d0,-(a7)
+		DOS	_PUTCHAR
+		addq.l	#2,a7
+		rts
+*****************************************************************
+echochar:
 		move.w	d0,-(a7)
 		move.w	d0,-(a7)
 		bsr	iscntrl
-		bne	getname_echo
+		bne	echochar_1
 
 		add.b	#$40,d0
 		and.b	#$7f,d0
 		move.w	d0,(a7)
 		moveq	#'^',d0
 		bsr	putchar
-getname_echo:
+echochar_1:
 		move.w	(a7)+,d0
 		bsr	putchar
 		move.w	(a7)+,d0
-
-		cmp.b	#$03,d0				*  $03 == ^C : Interrupt
-		beq	getname_interrupt
-
-		cmp.b	#$15,d0				*  $15 == ^U : Kill
-		beq	getname_cancel
-
-		cmp.l	d2,d1
-		bhs	getname_loop
-
-		move.b	d0,(a2)+
-		addq.l	#1,d1
-		bra	getname_loop
-
-getname_cancel:
-		bsr	put_newline
-		bra	getname_restart
-
-getname_interrupt:
-		bsr	put_newline
-getname_eof:
-		moveq	#-1,d0
-		bra	getname_return
-
-getname_done:
-		clr.b	(a2)
-		bsr	put_newline
-		move.l	d1,d0
-getname_return:
-		movem.l	(a7)+,d1-d2/a0-a2
 		rts
 ****************************************************************
 getnewpasswd:
@@ -855,12 +944,6 @@ make_sys_pathname:
 		movea.l	sysroot(a6),a1
 		bra	cat_pathname
 *****************************************************************
-putchar:
-		move.w	d0,-(a7)
-		DOS	_PUTCHAR
-		addq.l	#2,a7
-		rts
-*****************************************************************
 put_newline:
 		pea	str_newline(pc)
 		DOS	_PRINT
@@ -907,9 +990,9 @@ werror_count:
 
 	dc.b	0
 .if SYSV
-	dc.b	'## passwd.att 0.2 ##  Copyright(C)1992 by Itagaki Fumihiko',0
+	dc.b	'## passwd.att 0.3 ##  Copyright(C)1992-94 by Itagaki Fumihiko',0
 .else
-	dc.b	'## passwd.ucb 0.2 ##  Copyright(C)1992 by Itagaki Fumihiko',0
+	dc.b	'## passwd.ucb 0.3 ##  Copyright(C)1992-94 by Itagaki Fumihiko',0
 .endif
 
 word_LOGNAME:			dc.b	'LOGNAME',0
@@ -930,7 +1013,7 @@ msg_name:			dc.b	'ユーザ名: ',0
 msg_old_password:		dc.b	'旧パスワード:',0
 msg_new_password:		dc.b	'新パスワード:',0
 msg_retype:			dc.b	'新パスワードをもう一度入力してください:',0
-msg_sorry:			dc.b	'あいにくですが。',CR,LF,0
+msg_sorry:			dc.b	'ダメです。',CR,LF,0
 .if SYSV
 msg_sysv_too_short:		dc.b	'パスワードが短すぎます。少くとも６桁なければなりません。',CR,LF,0
 msg_too_few_alpha:		dc.b	'パスワードにはアルファベット文字が少くとも２つ含まれなければなりません。',CR,LF,0
@@ -938,8 +1021,8 @@ msg_no_special:			dc.b	'パスワードにはアルファベット以外の文字が少くとも１つ含ま
 msg_same_to_logname:		dc.b	'パスワードはログイン名やそれを反転あるいは回転したものであってはなりません。',CR,LF,0
 msg_too_few_diff:		dc.b	'新パスワードは少くとも３箇所の文字が旧パスワードと違っていなければなりません。',CR,LF,0
 msg_sysv_mismatch:		dc.b	'合致していません。もう一度おやり直しください。',CR,LF,0
-msg_too_many_failure:		dc.b	'失敗が多すぎます。後ほどまたおやり直しください。',CR,LF,0
-msg_too_many_tries:		dc.b	'やり直しが多すぎます。後ほどまたおやり直しください。',CR,LF,0
+msg_too_many_failure:		dc.b	'失敗が多すぎます。改めておやり直しください。',CR,LF,0
+msg_too_many_tries:		dc.b	'やり直しが多すぎます。改めておやり直しください。',CR,LF,0
 .else
 msg_bsd_too_short:		dc.b	'もっと長いパスワードをお使いください。',CR,LF,0
 msg_bsd_mismatch:		dc.b	'合致していません。'
@@ -955,6 +1038,7 @@ itoa64:				dc.b	'./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxy
 .bss
 .even
 bsstop:
+
 .offset 0
 sysroot:		ds.l	1
 name:			ds.l	1
@@ -980,6 +1064,7 @@ remove_ptmp:		ds.b	1
 .even
 stack_bottom:
 
-args_buffer:
+.bss
+			ds.b	stack_bottom
 *****************************************************************
 .end start
