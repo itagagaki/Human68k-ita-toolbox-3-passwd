@@ -1,0 +1,85 @@
+
+
+
+PASSWD(5)      Human68k ITA TOOLBOX User's Manual       PASSWD(5)
+
+
+
+名称
+     passwd - パスワード・ファイル
+
+形式
+     $SYSROOT/etc/passwd
+
+解説
+     passwd ファイルは，各ユーザのアカウントに関する基本情報を持
+     つテキスト・ファイルです．ユーザが Human68k にログインする際
+     に login(1) が参照するほか，さまざまなプログラムがユーザの情
+     報を得るために参照します．
+
+     passwd ファイルは，1行につき 1ユーザの情報を含みます．各行の
+     形式は次のとおりです．
+
+          username;password;uid;gid;gcos-field;home-dir;login-
+          shell
+
+     各行は，; で区切られた 7つの項目から成っています．それぞれの
+     項目は
+
+          username       ユーザのログイン名．1文字以上 8文字以内
+                         の文字列（ただし，1文字のシフトJIS文字は
+                         2文字分として数えます）．
+
+          password       暗号化されたユーザのパスワード．この項目
+                         は passwd(1) が記入します．この項目が空
+                         である場合，login(1) はユーザにパスワー
+                         ドの入力を要求しません．
+
+          uid            ユーザのID．0 以上 32767 以下の数値．原
+                         則として，複数のユーザに同じ uid を設定
+                         してはなりません．
+
+          gid            ユーザが所属するグループのID．0 以上
+                         32767 以下の数値．
+
+          gcos-field     ユーザの本名，居所，電話番号などの情報．
+
+          home-dir       ユーザのホーム・ディレクトリ（ログイン直
+                         後の作業ディレクトリ）のパス名．
+
+          login-shell    ログイン時に起動されるユーザの初期プログ
+                         ラムのパス名と引数文字列．この項目だけは
+                         ; を含むことができます．この項目が空の場
+                         合、login(1) は $SYSROOT/bin/COMMAND.X
+                         をデフォルトのシェルとして引数なしで起動
+                         します．パス名と引数文字列との間には 1文
+                         字以上の空白を置いて分離します．引数文字
+                         列は，プログラムに対する引数リストを
+                         HUPAIR にしたがってエンコードしたコマン
+                         ドライン文字列です．これは 252バイト以内
+                         でなければなりません．
+
+例
+     passwd ファイルの例を示します．
+
+          root;enydHZyXUG.lc;0;0;System Administrator;A:/;A:/bin/fish.x
+          shutdown;;10;0;shutdown;A:/;A:/bin/fish.x -f -b A:/etc/shutdown
+          ita;;100;100;Itagaki Fumihiko;A:/home/ita;A:/bin/fish.x
+
+     この例には root, shutdown, ita の 3ユーザのエントリがあり，
+     ユーザ root にのみパスワードが設定されています．ユーザ
+     shutdown はシステムをシャットダウンするシェル・スクリプト
+     A:/etc/shutdown を実行するためのエントリです．
+
+関連ファイル
+     $SYSROOT/etc/passwd      パスワード・ファイル
+
+関連事項
+     login(1), passwd(1)
+
+
+
+                    Last change: 21 Apr 1992     Itagaki Fumihiko
+
+
+
