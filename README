@@ -1,7 +1,7 @@
 
 
 
-            Human68k ITA TOOLBOX #3 - PASSWD  version 0.0
+            Human68k ITA TOOLBOX #3 - PASSWD  version 0.1
 
 
 
@@ -10,6 +10,9 @@
      イル $SYSROOT/etc/passwd のパスワード・フィールドに記入しま
      す。詳細は passwd.1 を参照してください。また、パスワード・ファ
      イルの書式については passwd.5 を参照してください。
+
+     今回から System-V系の passwd.att と BSD系の passwd.ucb の両
+     方を用意しました。どちらかを passwd.x として使ってください。
 
      お使いになる前には必ず同梱のファイル NOTICE をお読みになり、
      その内容に同意してからお使いください。
@@ -48,6 +51,9 @@
 ■
 
      英国のAlec氏に感謝の意を表します :-)
+
+     PASSWD について意見を寄せていただいた色白氏、沖＠沖氏、まめ
+     氏，あるた氏、その他の諸氏に感謝します。
 
 
 

@@ -1,6 +1,7 @@
 * passwd - change login password
 *
 * Itagaki Fumihiko 25-Aug-91  Create.
+* Itagaki Fumihiko 17-May-92  Add BSD style, and some bug fix.
 *
 * Usage: passwd [ name ]
 
@@ -12,19 +13,26 @@
 .include irandom.h
 
 .xref DecodeHUPAIR
+
+.if SYSV
 .xref isalpha
-.xref iscntrl
 .xref toupper
+.xref stricmp
+.xref reverse
+.xref rotate
+.else
+.xref islower
+.xref isupper
+.endif
+
+.xref iscntrl
 .xref strlen
 .xref strchr
 .xref strcmp
-.xref stricmp
 .xref memcmp
 .xref memset
 .xref strcpy
 .xref stpcpy
-.xref reverse
-.xref rotate
 .xref init_irandom
 .xref irandom
 .xref cat_pathname
@@ -290,6 +298,7 @@ opasswd_ok:
 leave_0:
 		moveq	#0,d0
 leave:
+		move.w	d0,-(a7)
 		bsr	clear_password_buffers
 		move.l	ptmp_fd(a6),d0
 		bmi	leavex1
@@ -469,10 +478,14 @@ ask_new_password_loop:
 		move.l	#MAXPASSWD,d0
 		bsr	getpassx
 		move.l	d0,d1				*  D1.L : パスワードの長さ
+.if SYSV
+*
+*  System-V 系の審査
+*
 		*
 		*  6文字以上あるか？
 		*
-		lea	msg_too_short(pc),a2
+		lea	msg_sysv_too_short(pc),a2
 		cmp.l	#6,d1
 		blo	failure
 
@@ -554,6 +567,55 @@ compare_2:
 
 compare_dec:
 		dbra	d2,compare_loop
+.else
+*
+*  BSD 系の審査
+*
+		*tst.l	d1
+		lea	msg_password_unchanged(pc),a0
+		beq	unchanged
+
+		lea	new_password(a6),a0
+		st	d2				*  only upper flag
+		st	d3				*  only lower flag
+passwd_count_loop:
+		move.b	(a0)+,d0
+		beq	passwd_count_done
+
+		bsr	islower
+		beq	clear_only_upper_flag
+
+		bsr	isupper
+		beq	clear_only_lower_flag
+
+		sf	d3
+clear_only_upper_flag:
+		sf	d2
+		bra	passwd_count_loop
+
+clear_only_lower_flag:
+		sf	d3
+		bra	passwd_count_loop
+
+passwd_count_done:
+		*
+		*  大文字のみか小文字のみの場合は 6文字以上
+		*  それ以外の場合は 4文字以上あるかどうかをチェックする
+		*
+		moveq	#6,d0
+		tst.b	d2
+		bne	check_password_length
+
+		tst.b	d3
+		bne	check_password_length
+
+		moveq	#4,d0
+check_password_length:
+		lea	msg_bsd_too_short(pc),a2
+		cmp.l	d0,d1
+		blo	failure
+.endif
+recognize:
 		*
 		*  もう一度聞いて照合する
 		*
@@ -591,28 +653,43 @@ compare_dec:
 		rts
 
 
-mismatch:
-		lea	msg_mismatch(pc),a0
-		bsr	print
-		sub.b	#1,tries_count(a6)
-		bne	ask_new_password_loop
-
-		lea	msg_too_many_tries(pc),a0
-		bra	unchanged
-
 failure:
+.if SYSV
 		movea.l	a2,a0
 		bsr	print
 		sub.b	#1,failures_count(a6)
 		bne	ask_new_password_loop
 
 		lea	msg_too_many_failure(pc),a0
+		bra	unchanged
+.else
+		sub.b	#1,failures_count(a6)
+		beq	recognize			*  BSD系は折れる
+
+		movea.l	a2,a0
+		bsr	print
+		bra	ask_new_password_loop
+.endif
+
+mismatch:
+.if SYSV
+		lea	msg_sysv_mismatch(pc),a0
+		bsr	print
+		sub.b	#1,tries_count(a6)
+		bne	ask_new_password_loop
+
+		lea	msg_too_many_tries(pc),a0
+.else
+		lea	msg_bsd_mismatch(pc),a0
+.endif
 unchanged:
 		bsr	print
 		bsr	clear_password_buffers
 		moveq	#1,d0
 		rts
 ****************
+.if SYSV
+
 compare_with_logname:
 		movem.l	d2/a0-a2,-(a7)
 		move.w	d1,d2
@@ -632,6 +709,8 @@ compare_with_logname_loop:
 compare_with_logname_return:
 		movem.l	(a7)+,d2/a0-a2
 		rts
+
+.endif
 *****************************************************************
 getpassx:
 		bsr	getpass
@@ -762,8 +841,7 @@ clear_password_buffers:
 		bsr	clear_1_password_buffer
 		lea	password_buf(a6),a0
 clear_1_password_buffer:
-		bsr	strlen
-		move.l	d0,d1
+		move.l	#MAXPASSWD+1,d1
 		moveq	#0,d0
 		bra	memset
 ****************************************************************
@@ -828,7 +906,11 @@ werror_count:
 .data
 
 	dc.b	0
-	dc.b	'## passwd 0.0 ##  Copyright(C)1992 by Itagaki Fumihiko',0
+.if SYSV
+	dc.b	'## passwd.att 0.1 ##  Copyright(C)1992 by Itagaki Fumihiko',0
+.else
+	dc.b	'## passwd.ucb 0.1 ##  Copyright(C)1992 by Itagaki Fumihiko',0
+.endif
 
 word_LOGNAME:			dc.b	'LOGNAME',0
 word_USER:			dc.b	'USER',0
@@ -848,15 +930,21 @@ msg_name:			dc.b	'ユーザ名: ',0
 msg_old_password:		dc.b	'旧パスワード:',0
 msg_new_password:		dc.b	'新パスワード:',0
 msg_retype:			dc.b	'新パスワードをもう一度入力してください:',0
-msg_too_short:			dc.b	'パスワードが短すぎます。少くとも６桁なければなりません。',CR,LF,0
+msg_sorry:			dc.b	'あいにくですが。',CR,LF,0
+.if SYSV
+msg_sysv_too_short:		dc.b	'パスワードが短すぎます。少くとも６桁なければなりません。',CR,LF,0
 msg_too_few_alpha:		dc.b	'パスワードにはアルファベット文字が少くとも２つ含まれなければなりません。',CR,LF,0
 msg_no_special:			dc.b	'パスワードにはアルファベット以外の文字が少くとも１つ含まれなければなりません。',CR,LF,0
 msg_same_to_logname:		dc.b	'パスワードはログイン名やそれを反転あるいは回転したものであってはなりません。',CR,LF,0
 msg_too_few_diff:		dc.b	'新パスワードは少くとも３箇所の文字が旧パスワードと違っていなければなりません。',CR,LF,0
+msg_sysv_mismatch:		dc.b	'合致していません。もう一度おやり直しください。',CR,LF,0
 msg_too_many_failure:		dc.b	'失敗が多すぎます。後ほどまたおやり直しください。',CR,LF,0
 msg_too_many_tries:		dc.b	'やり直しが多すぎます。後ほどまたおやり直しください。',CR,LF,0
-msg_mismatch:			dc.b	"合致していません。もう一度おやり直しください。",CR,LF,0
-msg_sorry:			dc.b	'あいにくですが。',CR,LF,0
+.else
+msg_bsd_too_short:		dc.b	'もっと長いパスワードをお使いください。',CR,LF,0
+msg_bsd_mismatch:		dc.b	'合致していません。'
+msg_password_unchanged:		dc.b	'パスワードは変更されませんでした。',CR,LF,0
+.endif
 
 path_passwd:			dc.b	'/etc/passwd',0
 path_ptmp:			dc.b	'/etc/ptmp',0
