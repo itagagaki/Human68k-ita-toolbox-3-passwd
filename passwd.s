@@ -907,9 +907,9 @@ werror_count:
 
 	dc.b	0
 .if SYSV
-	dc.b	'## passwd.att 0.1 ##  Copyright(C)1992 by Itagaki Fumihiko',0
+	dc.b	'## passwd.att 0.2 ##  Copyright(C)1992 by Itagaki Fumihiko',0
 .else
-	dc.b	'## passwd.ucb 0.1 ##  Copyright(C)1992 by Itagaki Fumihiko',0
+	dc.b	'## passwd.ucb 0.2 ##  Copyright(C)1992 by Itagaki Fumihiko',0
 .endif
 
 word_LOGNAME:			dc.b	'LOGNAME',0

@@ -3,7 +3,7 @@ README         まず最初にお読み下さい
 NOTICE         版権と許諾についての告示書
 DIRECTORY      ITA製品リスト
 CHANGES        PASSWDのモデルチェンジの履歴
-passwd.1       PASSWDのマニュアル
 passwd.att     System-V系 passwd 実行ファイル（.X タイプ）
 passwd.ucb     BSD系 passwd 実行ファイル（.X タイプ）
+passwd.1       passwd のマニュアル
 passwd.5       パスワード・ファイルのマニュアル

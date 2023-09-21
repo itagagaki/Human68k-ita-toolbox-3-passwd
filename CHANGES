@@ -1,12 +1,22 @@
-------  Version 0.1
+Version 0.2
 
- 3  ドキュメントの修正。
+* 仕様・機能の変更なし。
 
- 2  いくつかの BUG FIX。
 
- 1  System-V系の passwd.att と BSD系の passwd.ucb とを用意した。
 
-------  Version 0.0
+Version 0.1
 
- 1  作成。
+* ドキュメントの修正。
+
+* いくつかの BUG FIX。
+
+* System-V系の passwd.att と BSD系の passwd.ucb とを用意した。
+
+
+
+Version 0.0
+
+* 作成。
+
+
 

@@ -12,7 +12,7 @@ RM      = -\usr\local\bin\rm -f
 INCLUDE = ../fish/include
 
 DESTDIR   = A:\bin
-BACKUPDIR = B:\passwd\0.1
+BACKUPDIR = B:\passwd\0.2
 
 EXTLIB = $(HOME)/fish/lib/ita.l
 
